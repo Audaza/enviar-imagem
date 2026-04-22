@@ -1477,11 +1477,10 @@ gerarBtn.addEventListener('click', async () => {
         body: JSON.stringify({ image: currentDataUrl, formato: selectedFormato, analise: analysisData, modelar: mData }),
         signal: AbortSignal.timeout(180000)
       });
-      const text = await res.text();
-      if (!text.trim()) throw new Error('Servidor não retornou resposta.');
-      let data; try { data = JSON.parse(text); } catch { throw new Error('Resposta inválida: ' + text.slice(0,100)); }
-      const imageUrl = data.imageUrl || (data.b64_json ? `data:image/png;base64,${data.b64_json}` : null);
-      if (!imageUrl) throw new Error('Nenhuma imagem retornada. ' + JSON.stringify(data).slice(0,80));
+      if (!res.ok) { const t = await res.text(); throw new Error('Erro n8n: ' + t.slice(0,120)); }
+      const blob = await res.blob();
+      if (!blob || blob.size < 1000) throw new Error('Imagem não retornada pelo servidor.');
+      const imageUrl = URL.createObjectURL(blob);
       lastResultUrl  = imageUrl;
       lastResultName = `modelar_${selectedFormato}_${Date.now()}.png`;
       genLoading.classList.remove('visible');
@@ -1530,14 +1529,10 @@ gerarBtn.addEventListener('click', async () => {
       signal: AbortSignal.timeout(180000)
     });
 
-    const text = await res.text();
-    if (!text.trim()) throw new Error('Servidor não retornou resposta. Verifique o n8n.');
-
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error('Resposta inválida: ' + text.slice(0,100)); }
-
-    const imageUrl = data.imageUrl || (data.b64_json ? `data:image/png;base64,${data.b64_json}` : null);
-    if (!imageUrl) throw new Error('Nenhuma imagem retornada. ' + JSON.stringify(data).slice(0,80));
+    if (!res.ok) { const t = await res.text(); throw new Error('Erro n8n: ' + t.slice(0,120)); }
+    const blob = await res.blob();
+    if (!blob || blob.size < 1000) throw new Error('Imagem não retornada pelo servidor.');
+    const imageUrl = URL.createObjectURL(blob);
 
     // Overlay de logos com pixels exatos
     const finalUrl = await applyLogoOverlay(imageUrl, currentDataUrl, analysisData?.logos || []);
