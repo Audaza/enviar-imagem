@@ -1661,11 +1661,12 @@ function loadImage(src) {
 
 async function applyLogoOverlay(generatedDataUrl, referenceDataUrl, logos) {
   if (!logos || logos.length === 0) return generatedDataUrl;
-  const hasWork = logos.some(l => l.bbox && logosNovas[l.id]);
-  if (!hasWork) return generatedDataUrl;
+  const hasLogoWithBbox = logos.some(l => l.bbox);
+  if (!hasLogoWithBbox) return generatedDataUrl;
 
   try {
     const genImg = await loadImage(generatedDataUrl);
+    const refImg = await loadImage(referenceDataUrl);
 
     const canvas = document.createElement('canvas');
     canvas.width  = genImg.width;
@@ -1674,23 +1675,31 @@ async function applyLogoOverlay(generatedDataUrl, referenceDataUrl, logos) {
     ctx.drawImage(genImg, 0, 0);
 
     for (const logo of logos) {
-      if (!logo.bbox || !logosNovas[logo.id]) continue;
+      if (!logo.bbox) continue;
 
       const { x, y, w, h } = logo.bbox;
       const dx = Math.round(x * canvas.width);
       const dy = Math.round(y * canvas.height);
       const dw = Math.round(w * canvas.width);
       const dh = Math.round(h * canvas.height);
-      const cx = dx + dw / 2;
-      const cy = dy + dh / 2;
 
-      // A IA já apagou a logo antiga e restaurou o fundo naturalmente.
-      // Apenas desenhar a nova logo centralizada no bbox, proporção preservada.
-      const newLogoImg = await loadImage(logosNovas[logo.id]);
-      const scale = Math.min(dw / newLogoImg.width, dh / newLogoImg.height);
-      const fw = newLogoImg.width * scale;
-      const fh = newLogoImg.height * scale;
-      ctx.drawImage(newLogoImg, cx - fw / 2, cy - fh / 2, fw, fh);
+      if (logosNovas[logo.id]) {
+        // Nova logo: desenha centrada no bbox
+        const newLogoImg = await loadImage(logosNovas[logo.id]);
+        const cx = dx + dw / 2;
+        const cy = dy + dh / 2;
+        const scale = Math.min(dw / newLogoImg.width, dh / newLogoImg.height);
+        const fw = newLogoImg.width * scale;
+        const fh = newLogoImg.height * scale;
+        ctx.drawImage(newLogoImg, cx - fw / 2, cy - fh / 2, fw, fh);
+      } else {
+        // Sem nova logo: restaura pixels originais da imagem de referência
+        const srcX = Math.round(x * refImg.width);
+        const srcY = Math.round(y * refImg.height);
+        const srcW = Math.round(w * refImg.width);
+        const srcH = Math.round(h * refImg.height);
+        ctx.drawImage(refImg, srcX, srcY, srcW, srcH, dx, dy, dw, dh);
+      }
     }
 
     return canvas.toDataURL('image/png');
